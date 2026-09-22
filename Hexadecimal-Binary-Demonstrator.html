@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Craig's Base-N Demonstration</title>
+    <style>
+        :root {
+            --bg-color: #0a0a0a;
+            --flap-bg: #1e1e1e;
+            --text-color: #ffffff;
+            --speed: 0.2s;
+            --accent-dec: #00d4ff;
+            --accent-hex: #ff3e3e;
+            --accent-bin: #39ff14;
+            --dim-text: #888888;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Inter', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-around; 
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+            padding: 10px 0;
+            user-select: none;
+        }
+
+        /* Power Down State - Now nearly pitch black */
+        .powered-off {
+            opacity: 0.02 !important;
+            filter: brightness(0);
+            pointer-events: none;
+            transition: all 0.4s ease;
+        }
+
+        .binary-strip {
+            display: flex;
+            gap: 20px;
+            padding: 30px;
+            background: #111;
+            border-radius: 15px;
+            border: 2px solid #222;
+            transition: all 0.4s ease;
+        }
+
+        .bit-column { display: flex; flex-direction: column; align-items: center; width: 70px; }
+        .bit-value { font-size: 2.5rem; color: var(--dim-text); margin-bottom: 15px; font-weight: 900; transition: all 0.2s; }
+        .bit-value.active { color: var(--accent-bin); text-shadow: 0 0 20px var(--accent-bin); }
+        .led { width: 20px; height: 20px; border-radius: 50%; background: #222; transition: all 0.2s; border: 1px solid #333; }
+        .led.active { background: var(--accent-bin); box-shadow: 0 0 15px var(--accent-bin); border-color: #afff9e; }
+
+        .flap-area { display: flex; flex-direction: column; align-items: center; gap: 30px; transition: all 0.4s ease; }
+        .display-group { text-align: center; transition: all 0.4s ease; }
+        .label { font-weight: 900; text-transform: uppercase; margin-bottom: 10px; letter-spacing: 4px; font-size: 0.9rem; opacity: 0.7; }
+        .dec-label { color: var(--accent-dec); }
+        .hex-label { color: var(--accent-hex); }
+
+        .flap-container { display: flex; gap: 15px; perspective: 1200px; }
+        .flap {
+            position: relative; width: 100px; height: 150px; background: var(--flap-bg);
+            border-radius: 10px; font-size: 110px; line-height: 150px; text-align: center;
+            font-weight: 800; box-shadow: 0 12px 30px rgba(0,0,0,0.8); border-top: 5px solid transparent;
+        }
+        .dec-row .flap { border-top-color: var(--accent-dec); }
+        .hex-row .flap { border-top-color: var(--accent-hex); }
+        .flap::after { content: ''; position: absolute; top: 50%; left: 0; width: 100%; height: 3px; background: rgba(0,0,0,0.9); z-index: 10; }
+
+        .footer-controls { display: flex; flex-direction: column; align-items: center; gap: 20px; }
+        .nav-buttons { display: flex; gap: 20px; }
+        .power-switches { display: flex; gap: 30px; padding: 10px 30px; background: #111; border-radius: 50px; border: 1px solid #333; }
+        
+        .switch-group { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+        .switch-group label { font-size: 0.7rem; font-weight: 900; color: #555; text-transform: uppercase; cursor: pointer; }
+        
+        input[type="checkbox"] { cursor: pointer; width: 40px; height: 20px; appearance: none; background: #333; border-radius: 20px; position: relative; outline: none; transition: 0.3s; }
+        input[type="checkbox"]:checked { background: #444; }
+        input[type="checkbox"]:before { content: ''; position: absolute; width: 16px; height: 16px; border-radius: 50%; top: 2px; left: 2px; background: #000; transition: 0.3s; }
+        input[type="checkbox"]:checked:before { left: 22px; background: #fff; }
+
+        button { padding: 15px 35px; font-size: 1rem; background: #222; color: #fff; border: 1px solid #444; cursor: pointer; border-radius: 8px; font-weight: 900; transition: 0.2s; }
+        button:focus { outline: none; } /* Remove focus ring */
+
+        .leaf { position: absolute; top: -5px; left: 0; width: 100%; height: calc(50% + 5px); background: var(--flap-bg); border-radius: 10px 10px 0 0; z-index: 20; transform-origin: bottom; backface-visibility: hidden; border-top: 5px solid transparent; overflow: hidden; display: flex; justify-content: center; align-items: flex-start;}
+        .dec-row .leaf { border-top-color: var(--accent-dec); }
+        .hex-row .leaf { border-top-color: var(--accent-hex); }
+        .falling { animation: flipDown var(--speed) ease-in forwards; }
+        @keyframes flipDown { 0% { transform: rotateX(0deg); } 100% { transform: rotateX(-180deg); opacity: 0; } }
+    </style>
+</head>
+<body>
+
+<div id="section-bin" class="binary-strip"></div>
+
+<div class="flap-area">
+    <div id="section-dec" class="display-group dec-row">
+        <div class="label dec-label">Decimal</div>
+        <div class="flap-container">
+            <div class="flap" id="d2">0</div>
+            <div class="flap" id="d1">0</div>
+            <div class="flap" id="d0">0</div>
+        </div>
+    </div>
+
+    <div id="section-hex" class="display-group hex-row">
+        <div class="label hex-label">Hexadecimal</div>
+        <div class="flap-container">
+            <div class="flap" id="h2">0</div>
+            <div class="flap" id="h1">0</div>
+            <div class="flap" id="h0">0</div>
+        </div>
+    </div>
+</div>
+
+<div class="footer-controls">
+    <div class="nav-buttons">
+        <button id="btn-rev" onclick="handleBtnClick(-1)">REV</button>
+        <button id="btn-next" onclick="handleBtnClick(1)">NEXT</button>
+    </div>
+
+    <div class="power-switches">
+        <div class="switch-group">
+            <label>Binary</label>
+            <input type="checkbox" checked onchange="toggleSection('section-bin', this.checked)">
+        </div>
+        <div class="switch-group">
+            <label>Decimal</label>
+            <input type="checkbox" checked onchange="toggleSection('section-dec', this.checked)">
+        </div>
+        <div class="switch-group">
+            <label>Hex</label>
+            <input type="checkbox" checked onchange="toggleSection('section-hex', this.checked)">
+        </div>
+    </div>
+</div>
+
+<script>
+    let count = 0;
+    const bitValues = [512, 256, 128, 64, 32, 16, 8, 4, 2, 1];
+
+    const strip = document.getElementById('section-bin');
+    bitValues.forEach((val, i) => {
+        const col = document.createElement('div');
+        col.className = 'bit-column';
+        col.innerHTML = `<div class="bit-value" id="val-${i}">${val}</div><div class="led" id="led-${i}"></div>`;
+        strip.appendChild(col);
+    });
+
+    function toggleSection(id, isVisible) {
+        document.getElementById(id).classList.toggle('powered-off', !isVisible);
+        document.activeElement.blur(); // Remove focus from switch
+    }
+
+    function handleBtnClick(dir) {
+        step(dir);
+        document.activeElement.blur(); // Prevent Space/Enter double-trigger
+    }
+
+    function animateFlap(id, newVal) {
+        const el = document.getElementById(id);
+        const oldVal = el.childNodes[0].textContent;
+        if (oldVal === newVal.toString()) return;
+        const leaf = document.createElement('div');
+        leaf.className = 'leaf';
+        leaf.innerText = oldVal;
+        el.appendChild(leaf);
+        setTimeout(() => { el.childNodes[0].textContent = newVal; leaf.classList.add('falling'); }, 5);
+        leaf.addEventListener('animationend', () => leaf.remove());
+    }
+
+    function updateBinary() {
+        const binaryStr = count.toString(2).padStart(10, '0');
+        for(let i=0; i<10; i++) {
+            const bit = binaryStr[i];
+            const valEl = document.getElementById(`val-${i}`);
+            const ledEl = document.getElementById(`led-${i}`);
+            if(bit === '1') { valEl.classList.add('active'); ledEl.classList.add('active'); }
+            else { valEl.classList.remove('active'); ledEl.classList.remove('active'); }
+        }
+    }
+
+    function step(dir) {
+        count = Math.max(0, count + dir);
+        animateFlap('d0', Math.floor(count % 10));
+        animateFlap('d1', Math.floor((count / 10) % 10));
+        animateFlap('d2', Math.floor((count / 100) % 10));
+        const h = count.toString(16).toUpperCase().padStart(3, '0');
+        animateFlap('h0', h[2]); animateFlap('h1', h[1]); animateFlap('h2', h[0]);
+        updateBinary();
+    }
+
+    window.addEventListener('keydown', (e) => { 
+        if (e.code === 'Space' || e.code === 'ArrowRight') {
+            e.preventDefault(); // Stop page scroll/button repeat
+            step(1);
+        }
+        if (e.code === 'Backspace' || e.code === 'ArrowLeft') {
+            e.preventDefault();
+            step(-1);
+        }
+    });
+    
+    updateBinary();
+</script>
+</body>
+</html>
